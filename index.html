@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building a Self-Corrective RAG Pipeline with LangGraph</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0c0d12;
+    --bg2: #13141b;
+    --bg3: #1a1b24;
+    --border: #23252f;
+    --text: #c8c9cf;
+    --text2: #8b8d98;
+    --white: #eeeef0;
+    --purple: #a78bfa;
+    --purple2: #6366f1;
+    --green: #4ade80;
+    --amber: #f59e0b;
+    --red: #f43f5e;
+    --blue: #60a5fa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Hero ─────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 80px 20px 60px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #14151f 0%, var(--bg) 100%);
+  }
+
+  .hero-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--purple);
+    background: #6366f115;
+    border: 1px solid #6366f130;
+    padding: 4px 14px;
+    border-radius: 99px;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 {
+    font-family: 'Source Serif 4', serif;
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+
+  .hero p {
+    font-size: 17px;
+    color: var(--text2);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .tech-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 28px;
+  }
+
+  .tech-pill {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 99px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+
+  /* ── Content ──────────────────────── */
+  .content {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  .section {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section:last-child { border-bottom: none; }
+
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--purple);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 16px;
+  }
+
+  h3 {
+    font-family: 'Inter', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--white);
+    margin: 28px 0 12px;
+  }
+
+  p { margin-bottom: 16px; }
+
+  .file-ref {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--blue);
+    background: #60a5fa10;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #60a5fa20;
+  }
+
+  /* ── Code blocks ────────────────── */
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    color: var(--text2);
+  }
+
+  pre .kw { color: #c084fc; }
+  pre .str { color: #4ade80; }
+  pre .fn { color: #60a5fa; }
+  pre .cm { color: #3f4150; }
+  pre .tp { color: #f59e0b; }
+  pre .hl { color: var(--white); }
+
+  .code-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 6px 6px 0 0;
+    margin-bottom: -1px;
+    position: relative;
+    top: 1px;
+  }
+
+  /* ── Key point callouts ─────────── */
+  .callout {
+    background: var(--bg3);
+    border-left: 3px solid var(--purple2);
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+
+  .callout strong { color: var(--white); }
+
+  .callout-green { border-left-color: var(--green); }
+  .callout-amber { border-left-color: var(--amber); }
+  .callout-red   { border-left-color: var(--red); }
+
+  /* ── Graph section ──────────────── */
+  .graph-section {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .graph-wrapper {
+    margin: 32px auto;
+    overflow-x: auto;
+  }
+
+  .legend {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text2);
+  }
+
+  .legend-node { width: 16px; height: 16px; border-radius: 4px; background: var(--purple2); border: 2px solid var(--purple); }
+  .legend-edge { width: 32px; height: 3px; background: var(--green); border-radius: 2px; }
+  .legend-cond { width: 32px; height: 0; border-top: 3px dashed var(--amber); }
+  .legend-loop { width: 32px; height: 0; border-top: 3px dashed var(--red); }
+
+  /* ── File structure ─────────────── */
+  .file-tree {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin: 16px 0 24px;
+  }
+
+  .file-tree .folder { color: var(--amber); }
+  .file-tree .file   { color: var(--text2); }
+  .file-tree .desc   { color: #3f4150; }
+
+  /* ── Summary table ──────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text2);
+    background: var(--bg2);
+  }
+
+  td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--purple);
+  }
+
+  /* ── Footer ─────────────────────── */
+  .footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text2);
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+  }
+
+  svg text { font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<!-- ════════ HERO ════════ -->
+<div class="hero">
+  <div class="hero-badge">Technical Walkthrough</div>
+  <h1>Building a Self-Corrective<br>RAG Pipeline with LangGraph</h1>
+  <p>A step-by-step guide to building an agentic RAG system that rewrites queries, grades documents, detects hallucinations, and self-corrects with retry loops.</p>
+  <div class="tech-row">
+    <span class="tech-pill">Qdrant Cloud</span>
+    <span class="tech-pill">Google Gemini Embeddings</span>
+    <span class="tech-pill">OpenAI GPT-4o-mini</span>
+    <span class="tech-pill">LangGraph</span>
+    <span class="tech-pill">Streamlit</span>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ════════ INTRO ════════ -->
+<div class="section">
+  <div class="step-num">Introduction</div>
+  <h2>What is RAG and Why Self-Corrective?</h2>
+  <p><strong style="color:var(--white)">RAG (Retrieval-Augmented Generation)</strong> is a pattern where an LLM answers questions by first retrieving relevant documents from a knowledge base, then generating an answer grounded in those documents.</p>
+  <p>Basic RAG has a simple flow: <code>retrieve → generate</code>. But this breaks in three ways:</p>
+
+  <div class="callout callout-amber">
+    <strong>Problem 1:</strong> The user's question may not match documents well. A vague question like "what's that tall thing in Paris?" won't find "Eiffel Tower" in vector search.
+  </div>
+  <div class="callout callout-amber">
+    <strong>Problem 2:</strong> Retrieved documents may not actually be relevant. Vector similarity returns "similar" text, not necessarily "useful" text.
+  </div>
+  <div class="callout callout-red">
+    <strong>Problem 3:</strong> The LLM may hallucinate — making up facts that aren't in the retrieved documents.
+  </div>
+
+  <p>This pipeline fixes all three with <strong style="color:var(--white)">query rewriting</strong>, <strong style="color:var(--white)">relevance grading</strong>, <strong style="color:var(--white)">web search fallback</strong>, and <strong style="color:var(--white)">hallucination checking with retry</strong>.</p>
+</div>
+
+<!-- ════════ FILE STRUCTURE ════════ -->
+<div class="section">
+  <div class="step-num">Project Structure</div>
+  <h2>One File Per Concern</h2>
+  <p>Each file does exactly one thing. You can read any file in isolation and understand it completely.</p>
+
+  <div class="file-tree">
+    <span class="folder">RAG/</span><br>
+    ├── <span class="file">config.py</span> <span class="desc">← All settings and API keys</span><br>
+    ├── <span class="file">embeddings.py</span> <span class="desc">← Google embedding model (text → vectors)</span><br>
+    ├── <span class="file">llm.py</span> <span class="desc">← OpenAI LLM (generates text)</span><br>
+    ├── <span class="file">chunker.py</span> <span class="desc">← Text chunking + PDF extraction</span><br>
+    ├── <span class="file">database.py</span> <span class="desc">← Qdrant: store and search documents</span><br>
+    │<br>
+    ├── <span class="file">state.py</span> <span class="desc">← RAGState — data flowing through the graph</span><br>
+    ├── <span class="file">nodes.py</span> <span class="desc">← The 6 node functions (the logic)</span><br>
+    ├── <span class="file">graph.py</span> <span class="desc">← Wires nodes into the LangGraph (the flow)</span><br>
+    │<br>
+    └── <span class="file">app.py</span> <span class="desc">← Streamlit UI</span>
+  </div>
+</div>
+
+<!-- ════════ STEP 1 ════════ -->
+<div class="section">
+  <div class="step-num">Step 1</div>
+  <h2>Set Up the Models</h2>
+  <p>We need two AI models: one to convert text into vectors (embeddings), and one to generate text (LLM).</p>
+
+  <h3><span class="file-ref">embeddings.py</span> — Text → Vectors</h3>
+  <pre><span class="kw">from</span> langchain_google_genai <span class="kw">import</span> GoogleGenerativeAIEmbeddings
+
+<span class="kw">def</span> <span class="fn">get_embedding_model</span>():
+    <span class="cm">"""Converts text into 3072-dimensional vectors."""</span>
+    <span class="kw">return</span> GoogleGenerativeAIEmbeddings(
+        model=<span class="str">"models/gemini-embedding-001"</span>,
+        google_api_key=GOOGLE_API_KEY,
+    )</pre>
+
+  <h3><span class="file-ref">llm.py</span> — The Brain</h3>
+  <pre><span class="kw">from</span> langchain_openai <span class="kw">import</span> ChatOpenAI
+
+<span class="kw">def</span> <span class="fn">get_llm</span>(temperature=<span class="tp">0</span>):
+    <span class="cm">"""OpenAI GPT-4o-mini — generates answers."""</span>
+    <span class="kw">return</span> ChatOpenAI(
+        model=<span class="str">"gpt-4o-mini"</span>,
+        temperature=temperature,
+    )</pre>
+
+  <div class="callout callout-green">
+    <strong>Why two models?</strong> Embeddings are cheap and fast (just converting text to numbers). The LLM is smarter but slower — we only use it for tasks that need reasoning.
+  </div>
+</div>
+
+<!-- ════════ STEP 2 ════════ -->
+<div class="section">
+  <div class="step-num">Step 2</div>
+  <h2>Store Documents in Qdrant</h2>
+  <p>Before we can search, we need to store documents. Each document gets chunked into small pieces, embedded into vectors, and stored in Qdrant Cloud.</p>
+
+  <h3><span class="file-ref">chunker.py</span> — Split Text into Chunks</h3>
+  <pre><span class="kw">def</span> <span class="fn">chunk_text</span>(text, chunk_size=<span class="tp">500</span>, overlap=<span class="tp">50</span>):
+    <span class="cm">"""Split long text into overlapping pieces.</span>
+    <span class="cm">   Overlap ensures we don't lose context at boundaries."""</span>
+    chunks = []
+    start = <span class="tp">0</span>
+    <span class="kw">while</span> start < len(text):
+        chunk = text[start : start + chunk_size].strip()
+        <span class="kw">if</span> chunk:
+            chunks.append(chunk)
+        start += chunk_size - overlap
+    <span class="kw">return</span> chunks</pre>
+
+  <h3><span class="file-ref">database.py</span> — Store and Search</h3>
+  <pre><span class="kw">def</span> <span class="fn">add_documents</span>(texts):
+    <span class="cm">"""Chunk → embed → store in Qdrant."""</span>
+    store = get_vector_store()
+    all_chunks = []
+    <span class="kw">for</span> text <span class="kw">in</span> texts:
+        all_chunks.extend(chunk_text(text))
+    store.add_texts(all_chunks)
+    <span class="kw">return</span> len(all_chunks)
+
+<span class="kw">def</span> <span class="fn">search_with_scores</span>(query, top_k=<span class="tp">4</span>):
+    <span class="cm">"""Find similar docs with similarity scores."""</span>
+    store = get_vector_store()
+    results = store.similarity_search_with_score(query, k=top_k)
+    <span class="kw">return</span> [(doc.page_content, score) <span class="kw">for</span> doc, score <span class="kw">in</span> results]</pre>
+</div>
+
+<!-- ════════ STEP 3 ════════ -->
+<div class="section">
+  <div class="step-num">Step 3</div>
+  <h2>Define the Pipeline State</h2>
+  <p>LangGraph needs a <strong style="color:var(--white)">typed state</strong> — a structured object that flows through every node. Think of it as a form that gets filled in step by step.</p>
+
+  <h3><span class="file-ref">state.py</span> — The Data That Flows</h3>
+  <pre><span class="kw">class</span> <span class="fn">RAGState</span>(TypedDict):
+    question: <span class="tp">str</span>                     <span class="cm"># what the user asked</span>
+    rewritten_query: <span class="tp">str</span>              <span class="cm"># improved query for search</span>
+    documents: <span class="tp">list[tuple[str, float]]</span> <span class="cm"># retrieved (text, score) pairs</span>
+    relevant_docs: <span class="tp">list[str]</span>          <span class="cm"># docs that passed grading</span>
+    web_results: <span class="tp">str</span>                  <span class="cm"># web search fallback results</span>
+    answer: <span class="tp">str</span>                       <span class="cm"># the generated answer</span>
+    retry_count: <span class="tp">int</span>                  <span class="cm"># generation attempts</span>
+    is_grounded: <span class="tp">bool</span>                 <span class="cm"># hallucination check result</span>
+    steps: <span class="tp">Annotated[list[str], merge]</span> <span class="cm"># trace log</span></pre>
+
+  <div class="callout">
+    <strong>The <code>steps</code> field uses an <code>Annotated</code> reducer</strong> — this means each node <em>appends</em> to the list instead of replacing it. Every node adds a log message, building a complete trace of what happened.
+  </div>
+</div>
+
+<!-- ════════ STEP 4: NODES ════════ -->
+<div class="section">
+  <div class="step-num">Step 4</div>
+  <h2>Build the 6 Node Functions</h2>
+  <p>Each node is a plain Python function: it receives the current state and returns the fields it wants to update. All 6 nodes live in <span class="file-ref">nodes.py</span>.</p>
+
+  <table>
+    <tr><th>Node</th><th>What it does</th></tr>
+    <tr><td>rewrite_query</td><td>LLM rewrites the user's question for better vector search</td></tr>
+    <tr><td>retrieve</td><td>Searches Qdrant for the 4 most similar document chunks</td></tr>
+    <tr><td>grade_documents</td><td>LLM grades each doc: "Is this actually relevant?" (yes/no)</td></tr>
+    <tr><td>websearch_fallback</td><td>If no relevant docs, search the web via DuckDuckGo</td></tr>
+    <tr><td>generate</td><td>LLM generates the final answer from the best available context</td></tr>
+    <tr><td>check_hallucination</td><td>LLM verifies: "Is this answer supported by the context?"</td></tr>
+  </table>
+
+  <p>There are also <strong style="color:var(--white)">two routing functions</strong> that decide which path to take:</p>
+
+  <pre><span class="kw">def</span> <span class="fn">route_after_grading</span>(state):
+    <span class="cm">"""Relevant docs found? → generate. None found? → web search."""</span>
+    <span class="kw">if</span> state[<span class="str">"relevant_docs"</span>]:
+        <span class="kw">return</span> <span class="str">"generate"</span>
+    <span class="kw">return</span> <span class="str">"websearch_fallback"</span>
+
+<span class="kw">def</span> <span class="fn">route_after_check</span>(state):
+    <span class="cm">"""Grounded? → done. Hallucinated + retries left? → retry."""</span>
+    <span class="kw">if</span> state.get(<span class="str">"is_grounded"</span>, <span class="tp">True</span>):
+        <span class="kw">return</span> <span class="str">"accept"</span>
+    <span class="kw">if</span> state.get(<span class="str">"retry_count"</span>, <span class="tp">0</span>) < <span class="tp">2</span>:
+        <span class="kw">return</span> <span class="str">"retry"</span>
+    <span class="kw">return</span> <span class="str">"accept"</span></pre>
+</div>
+
+<!-- ════════ THE GRAPH (CENTER PIECE) ════════ -->
+<div class="graph-section">
+  <div class="content">
+    <div class="step-num">Step 5 — The Core</div>
+    <h2>Wire the Graph</h2>
+    <p style="color:var(--text2); max-width:580px; margin:0 auto 24px;">This is where LangGraph shines. We connect nodes with edges, conditional branches, and a retry loop.</p>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-node"></div> Node (function)</div>
+      <div class="legend-item"><div class="legend-edge"></div> Edge (always)</div>
+      <div class="legend-item"><div class="legend-cond"></div> Branch (conditional)</div>
+      <div class="legend-item"><div class="legend-loop"></div> Loop (retry)</div>
+    </div>
+
+    <div class="graph-wrapper">
+      <svg width="720" height="600" viewBox="0 0 720 600">
+        <defs>
+          <marker id="ag" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0,10 3.5,0 7" fill="#4ade80"/></marker>
+          <marker id="aa" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0,10 3.5,0 7" fill="#f59e0b"/></marker>
+          <marker id="ar" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><polygon points="0 0,10 3.5,0 7" fill="#f43f5e"/></marker>
+        </defs>
+
+        <circle cx="360" cy="24" r="16" fill="none" stroke="#3f4150" stroke-width="2"/>
+        <text x="360" y="29" text-anchor="middle" fill="#52525b" font-size="10" font-weight="700">START</text>
+
+        <line x1="360" y1="40" x2="360" y2="65" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+
+        <rect x="260" y="70" width="200" height="40" rx="8" fill="#6366f112" stroke="#6366f1" stroke-width="2"/>
+        <text x="360" y="95" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600">rewrite_query</text>
+
+        <line x1="360" y1="110" x2="360" y2="145" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+
+        <rect x="260" y="150" width="200" height="40" rx="8" fill="#6366f112" stroke="#6366f1" stroke-width="2"/>
+        <text x="360" y="175" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600">retrieve</text>
+
+        <line x1="360" y1="190" x2="360" y2="225" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+
+        <rect x="260" y="230" width="200" height="40" rx="8" fill="#6366f112" stroke="#6366f1" stroke-width="2"/>
+        <text x="360" y="255" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600">grade_documents</text>
+
+        <!-- Branch arrows -->
+        <line x1="310" y1="270" x2="220" y2="355" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,4" marker-end="url(#aa)"/>
+        <rect x="170" y="300" width="72" height="20" rx="5" fill="var(--bg)" stroke="#f59e0b30" stroke-width="1"/>
+        <text x="206" y="314" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">relevant</text>
+
+        <line x1="410" y1="270" x2="530" y2="320" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7,4" marker-end="url(#aa)"/>
+        <rect x="448" y="280" width="92" height="20" rx="5" fill="var(--bg)" stroke="#f59e0b30" stroke-width="1"/>
+        <text x="494" y="294" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">not relevant</text>
+
+        <rect x="490" y="325" width="200" height="40" rx="8" fill="#6366f112" stroke="#6366f1" stroke-width="2"/>
+        <text x="590" y="350" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600">websearch_fallback</text>
+
+        <line x1="490" y1="365" x2="270" y2="375" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+
+        <rect x="120" y="360" width="200" height="40" rx="8" fill="#6366f112" stroke="#6366f1" stroke-width="2"/>
+        <text x="220" y="385" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600">generate</text>
+
+        <line x1="220" y1="400" x2="220" y2="445" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+
+        <rect x="95" y="450" width="250" height="40" rx="8" fill="#6366f112" stroke="#6366f1" stroke-width="2"/>
+        <text x="220" y="475" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600">check_hallucination</text>
+
+        <!-- Accept → END -->
+        <line x1="220" y1="490" x2="220" y2="535" stroke="#f43f5e" stroke-width="2" stroke-dasharray="7,4" marker-end="url(#ar)"/>
+        <rect x="234" y="502" width="72" height="20" rx="5" fill="var(--bg)" stroke="#4ade8030" stroke-width="1"/>
+        <text x="270" y="516" text-anchor="middle" fill="#4ade80" font-size="10" font-weight="600">grounded</text>
+
+        <circle cx="220" cy="555" r="16" fill="none" stroke="#3f4150" stroke-width="2"/>
+        <text x="220" y="560" text-anchor="middle" fill="#52525b" font-size="10" font-weight="700">END</text>
+
+        <!-- Retry loop -->
+        <path d="M 345 470 C 420 470, 420 380, 320 380" fill="none" stroke="#f43f5e" stroke-width="2" stroke-dasharray="7,4" marker-end="url(#ar)"/>
+        <rect x="375" y="408" width="100" height="20" rx="5" fill="var(--bg)" stroke="#f43f5e30" stroke-width="1"/>
+        <text x="425" y="422" text-anchor="middle" fill="#f43f5e" font-size="10" font-weight="600">not grounded</text>
+        <text x="425" y="436" text-anchor="middle" fill="#3f4150" font-size="9">(retry — max 1)</text>
+      </svg>
+    </div>
+
+    <!-- Code that builds this graph -->
+    <div style="text-align:left">
+    <div class="code-label">graph.py</div>
+    <pre>graph = StateGraph(RAGState)
+
+<span class="cm"># 6 Nodes — the steps</span>
+graph.<span class="fn">add_node</span>(<span class="str">"rewrite_query"</span>, rewrite_query)
+graph.<span class="fn">add_node</span>(<span class="str">"retrieve"</span>, retrieve)
+graph.<span class="fn">add_node</span>(<span class="str">"grade_documents"</span>, grade_documents)
+graph.<span class="fn">add_node</span>(<span class="str">"websearch_fallback"</span>, websearch_fallback)
+graph.<span class="fn">add_node</span>(<span class="str">"generate"</span>, generate)
+graph.<span class="fn">add_node</span>(<span class="str">"check_hallucination"</span>, check_hallucination)
+
+<span class="cm"># Edges — fixed connections (green solid arrows)</span>
+graph.<span class="fn">add_edge</span>(START, <span class="str">"rewrite_query"</span>)
+graph.<span class="fn">add_edge</span>(<span class="str">"rewrite_query"</span>, <span class="str">"retrieve"</span>)
+graph.<span class="fn">add_edge</span>(<span class="str">"retrieve"</span>, <span class="str">"grade_documents"</span>)
+graph.<span class="fn">add_edge</span>(<span class="str">"websearch_fallback"</span>, <span class="str">"generate"</span>)
+graph.<span class="fn">add_edge</span>(<span class="str">"generate"</span>, <span class="str">"check_hallucination"</span>)
+
+<span class="cm"># Branch — conditional routing (amber dashed arrows)</span>
+graph.<span class="fn">add_conditional_edges</span>(
+    <span class="str">"grade_documents"</span>, route_after_grading,
+    {<span class="str">"generate"</span>: <span class="str">"generate"</span>, <span class="str">"websearch_fallback"</span>: <span class="str">"websearch_fallback"</span>}
+)
+
+<span class="cm"># Loop — retry cycle (red dashed arrows)</span>
+graph.<span class="fn">add_conditional_edges</span>(
+    <span class="str">"check_hallucination"</span>, route_after_check,
+    {<span class="str">"accept"</span>: END, <span class="str">"retry"</span>: <span class="str">"generate"</span>}
+)</pre>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ════════ STEP 6 ════════ -->
+<div class="section">
+  <div class="step-num">Step 6</div>
+  <h2>The Streamlit UI</h2>
+  <p><span class="file-ref">app.py</span> provides a chat interface where users can add documents, ask questions, and see exactly what happened at each pipeline step.</p>
+
+  <h3>Key Features</h3>
+  <table>
+    <tr><td>Chat interface</td><td>Message history with <code>st.chat_message</code></td></tr>
+    <tr><td>Document upload</td><td>Paste text or upload PDFs</td></tr>
+    <tr><td>Pipeline trace</td><td>Expand any answer to see all 6 steps</td></tr>
+    <tr><td>Graph image</td><td>LangGraph visualization in sidebar</td></tr>
+    <tr><td>Document count</td><td>Live count from Qdrant</td></tr>
+  </table>
+</div>
+
+<!-- ════════ WHY LANGGRAPH ════════ -->
+<div class="section">
+  <div class="step-num">Key Insight</div>
+  <h2>Why LangGraph?</h2>
+  <p>A simple chain (<code>retrieve → generate</code>) can't do what this pipeline does. Here's why:</p>
+
+  <div class="callout callout-green">
+    <strong>Conditional Branch</strong> — After grading, the pipeline picks one of two paths. A chain can't branch.
+  </div>
+  <div class="callout callout-red">
+    <strong>Retry Loop</strong> — If the answer hallucinates, the pipeline goes <em>back</em> to generate and tries again. A chain can't loop.
+  </div>
+
+  <p>LangGraph gives you a <strong style="color:var(--white)">graph</strong> instead of a chain. Graphs can branch and loop — that's the fundamental difference.</p>
+
+  <h3>LangGraph Concepts Used</h3>
+  <table>
+    <tr><th>Concept</th><th>Where</th></tr>
+    <tr><td>StateGraph</td><td>Typed state that flows through every node</td></tr>
+    <tr><td>add_node</td><td>Register a Python function as a step</td></tr>
+    <tr><td>add_edge</td><td>Fixed connection: "always go here next"</td></tr>
+    <tr><td>add_conditional_edges</td><td>Branch: pick a path based on state</td></tr>
+    <tr><td>Annotated reducer</td><td>The <code>steps</code> list appends instead of replacing</td></tr>
+    <tr><td>Cycle</td><td>check_hallucination can loop back to generate</td></tr>
+  </table>
+</div>
+
+<!-- ════════ SUMMARY ════════ -->
+<div class="section">
+  <div class="step-num">Summary</div>
+  <h2>What Makes This Better Than Basic RAG</h2>
+
+  <table>
+    <tr><th>Basic RAG</th><th>This Pipeline</th></tr>
+    <tr><td>retrieve → generate</td><td>6 nodes with branching and loops</td></tr>
+    <tr><td>Raw user query</td><td>LLM-rewritten query for better search</td></tr>
+    <tr><td>All retrieved docs used</td><td>Each doc graded for relevance</td></tr>
+    <tr><td>Fails if no docs found</td><td>Falls back to web search</td></tr>
+    <tr><td>No answer verification</td><td>Hallucination check with retry</td></tr>
+    <tr><td>Black box</td><td>Full pipeline trace showing every step</td></tr>
+  </table>
+</div>
+
+</div>
+
+<div class="footer">
+  Built with Qdrant Cloud · Google Gemini Embeddings · OpenAI GPT-4o-mini · LangGraph · Streamlit
+</div>
+
+</body>
+</html>
